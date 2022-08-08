@@ -355,3 +355,6 @@ void Run()
         Rectangle(g_hDC, (*iter).rc.l, (*iter).rc.t, (*iter).rc.r, (*iter).rc.b);
     }
 }
+
+//testing github~~~~~
+//~~~~~~~~~~~~~~~~~~~
