@@ -5,6 +5,7 @@
 #include "framework.h"
 #include "winapi_2.h"
 #include <list>
+#include <math.h>
 
 using namespace std;
 
@@ -14,9 +15,14 @@ typedef struct _tagRectangle
 {
     float l, t, r, b;
 }RECTANGLE, *PRECTANGLE;
+typedef struct _tagSphere
+{
+    float x, y;
+    float r;
+}SPHERE, *PSPHERE;
 typedef struct _tagEnemy
 {
-    RECTANGLE tRC;
+    SPHERE tSphere;
     float fSpeed;
     float fTime;
     float fLimitTime;
@@ -38,7 +44,7 @@ ENEMY g_tEnemy;
 
 typedef struct _tagBullet
 {
-    RECTANGLE rc;
+    SPHERE tSphere;
     float fDist;
     float fLimitDist;
 }BULLET, *PBULLET;
@@ -85,10 +91,9 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     g_hDC = GetDC(g_hWnd);
 
     //Enemy 초기화
-    g_tEnemy.tRC.l = 700.f - 100.f;
-    g_tEnemy.tRC.r = 700.f;
-    g_tEnemy.tRC.t = 0.f;
-    g_tEnemy.tRC.b = 100.f;
+    g_tEnemy.tSphere.x = 800.f - 50.f;
+    g_tEnemy.tSphere.y = 50.f;
+    g_tEnemy.tSphere.r = 50.f;
     g_tEnemy.fSpeed = 300.f;
     g_tEnemy.fTime = 0.f;
     g_tEnemy.fLimitTime = 0.5f;
@@ -333,14 +338,36 @@ void Run()
     {
         BULLET tBullet;
 
-        tBullet.rc.l = g_tPlayerRC.r;
-        tBullet.rc.r = g_tPlayerRC.r + 50.f;
-        tBullet.rc.t = (g_tPlayerRC.t + g_tPlayerRC.b) / 2.f - 25.f;
-        tBullet.rc.b = tBullet.rc.t + 50.f;
+        tBullet.tSphere.x = g_tPlayerRC.r + 25.f;
+        tBullet.tSphere.y = g_tPlayerRC.t + 25.f;
+        tBullet.tSphere.r = 25.f;
         tBullet.fDist = 0.f;
         tBullet.fLimitDist = 500.f;
 
         g_PlayerBulletList.push_back(tBullet);
+    }
+    if (GetAsyncKeyState(VK_LBUTTON) & 0x8000)
+    {
+        //마우스 위치를 얻어온다
+        POINT ptMouse;
+        //아래 함수는 마우스 위치를 얻어온다
+        //마우스 위치는 스크린 좌표 기준으로 얻어온다
+        GetCursorPos(&ptMouse);
+        //스크린좌표를 클라이언트 좌표로 변환한다.
+        ScreenToClient(g_hWnd, &ptMouse);
+        //플레이어,Enemy와 마우스 충돌처리
+        if (g_tPlayerRC.l <= ptMouse.x && ptMouse.x <= g_tPlayerRC.r &&
+            g_tPlayerRC.t <= ptMouse.y && ptMouse.y <= g_tPlayerRC.b)
+        {
+            MessageBox(NULL, L"플레이어 클릭", L"마우스클릭", MB_OK);
+        }
+        float fMX = g_tEnemy.tSphere.x - ptMouse.x;
+        float fMY = g_tEnemy.tSphere.y - ptMouse.y;
+        float fDist = sqrtf(fMX * fMX + fMY * fMY);
+        if (g_tEnemy.tSphere.r >= fDist)
+        {
+            MessageBox(NULL, L"몬스터 클릭", L"마우스클릭", MB_OK);
+        }
 
     }
 
@@ -351,15 +378,25 @@ void Run()
     fSpeed = 1000.f * g_fDeltaTime * fTimeScale;
     for (iter = g_PlayerBulletList.begin(); iter != iterEnd;)
     {
-        (*iter).rc.l += fSpeed;
-        (*iter).rc.r += fSpeed;
+        (*iter).tSphere.x += fSpeed;
         (*iter).fDist += fSpeed;
-        if ((*iter).fDist >= (*iter).fLimitDist)
+        
+        float fX = (*iter).tSphere.x - g_tEnemy.tSphere.x;
+        float fY = (*iter).tSphere.y - g_tEnemy.tSphere.y;
+        float fDist = sqrtf(fX * fX + fY * fY);
+
+        // player 총알 대 enemy 충돌 ( 원 충돌 )
+        if (fDist <= (*iter).tSphere.r + g_tEnemy.tSphere.r)
         {
             iter = g_PlayerBulletList.erase(iter);
             iterEnd = g_PlayerBulletList.end();
         }
-        else if ((*iter).rc.l > rcWindow.right)
+        else if ((*iter).fDist >= (*iter).fLimitDist)
+        {
+            iter = g_PlayerBulletList.erase(iter);
+            iterEnd = g_PlayerBulletList.end();
+        }
+        else if ((*iter).tSphere.x - (*iter).tSphere.r > rcWindow.right)
         {
             iter = g_PlayerBulletList.erase(iter);
             iterEnd = g_PlayerBulletList.end();
@@ -369,16 +406,14 @@ void Run()
 
 	}
     // Newcode Enemy
-    g_tEnemy.tRC.t += g_tEnemy.fSpeed * g_fDeltaTime * fTimeScale * g_tEnemy.iDir;
-    g_tEnemy.tRC.b += g_tEnemy.fSpeed * g_fDeltaTime * fTimeScale * g_tEnemy.iDir;
-    if (g_tEnemy.tRC.b > 600) {
-        g_tEnemy.tRC.t = 500;
-        g_tEnemy.tRC.b = 600;
+    g_tEnemy.tSphere.y += g_tEnemy.fSpeed * g_fDeltaTime * fTimeScale * g_tEnemy.iDir;
+    //g_tEnemy.tSphere.b += g_tEnemy.fSpeed * g_fDeltaTime * fTimeScale * g_tEnemy.iDir;
+    if (g_tEnemy.tSphere.y + g_tEnemy.tSphere.r > 600) {
+        g_tEnemy.tSphere.y = 550;
         g_tEnemy.iDir = -1;
     }
-    else if (g_tEnemy.tRC.t < 0) {
-        g_tEnemy.tRC.t = 0;
-        g_tEnemy.tRC.b = 100;
+    else if (g_tEnemy.tSphere.y - g_tEnemy.tSphere.r < 0) {
+        g_tEnemy.tSphere.y = 50;
         g_tEnemy.iDir = 1;
     }
 
@@ -389,12 +424,11 @@ void Run()
         g_tEnemy.fTime -= g_tEnemy.fLimitTime;
 
         BULLET e_bullet;
-        e_bullet.rc.l = g_tEnemy.tRC.l - 50.f;
-        e_bullet.rc.r = g_tEnemy.tRC.l;
-        e_bullet.rc.t = (g_tEnemy.tRC.t + g_tEnemy.tRC.b) / 2.f - 25.f;
-        e_bullet.rc.b = e_bullet.rc.t + 50.f;
+        e_bullet.tSphere.x = g_tEnemy.tSphere.x - g_tEnemy.tSphere.r - 25.f;
+        e_bullet.tSphere.y = g_tEnemy.tSphere.y;
+        e_bullet.tSphere.r = 25.f;
         e_bullet.fDist = 0.f;
-        e_bullet.fLimitDist = 600.f;
+        e_bullet.fLimitDist = 800.f;
 
         g_EnemyBulletList.push_back(e_bullet);
     }
@@ -403,27 +437,27 @@ void Run()
     iterEnd = g_EnemyBulletList.end();
     for (iter = g_EnemyBulletList.begin(); iter != iterEnd;)
     {
-        (*iter).rc.l -= fSpeed;
-        (*iter).rc.r -= fSpeed;
+        (*iter).tSphere.x -= fSpeed;
         (*iter).fDist += fSpeed;
         if ((*iter).fDist >= (*iter).fLimitDist)
         {
             iter = g_EnemyBulletList.erase(iter);
             iterEnd = g_EnemyBulletList.end();
         }
-        else if ((*iter).rc.r < rcWindow.left)
+        else if ((*iter).tSphere.x + (*iter).tSphere.r < rcWindow.left)
         {
             iter = g_EnemyBulletList.erase(iter);
             iterEnd = g_EnemyBulletList.end();
         }
-        // player와 enemy bullet 충돌 검사
+        // player와 enemy bullet 충돌 검사 ( RECT 충돌 )
+        /*
         else if (g_tPlayerRC.l <= (*iter).rc.r && g_tPlayerRC.r >= (*iter).rc.l
             && g_tPlayerRC.t <= (*iter).rc.b && g_tPlayerRC.b >= (*iter).rc.t)
         {
             iter = g_EnemyBulletList.erase(iter);
             iterEnd = g_EnemyBulletList.end();
         }
-
+        */
         else
             iter++;
 
@@ -477,21 +511,30 @@ void Run()
     }*/
 
     // 출력
-    //Rectangle(g_hDC, 0, 0, rcWindow.right, rcWindow.bottom);
+    Rectangle(g_hDC, 0, 0, rcWindow.right, rcWindow.bottom);
     
     Rectangle(g_hDC, g_tPlayerRC.l, g_tPlayerRC.t, g_tPlayerRC.r, g_tPlayerRC.b);
 
-    Rectangle(g_hDC, g_tEnemy.tRC.l, g_tEnemy.tRC.t, g_tEnemy.tRC.r, g_tEnemy.tRC.b);
+    Ellipse(g_hDC, g_tEnemy.tSphere.x - g_tEnemy.tSphere.r,
+        g_tEnemy.tSphere.y - g_tEnemy.tSphere.r,
+        g_tEnemy.tSphere.x + g_tEnemy.tSphere.r,
+        g_tEnemy.tSphere.y + g_tEnemy.tSphere.r);
 
     iterEnd = g_PlayerBulletList.end();
     for (iter = g_PlayerBulletList.begin(); iter != iterEnd; iter++)
     {
-        Rectangle(g_hDC, (*iter).rc.l, (*iter).rc.t, (*iter).rc.r, (*iter).rc.b);
+        Ellipse(g_hDC, (*iter).tSphere.x - (*iter).tSphere.r,
+            (*iter).tSphere.y - (*iter).tSphere.r,
+            (*iter).tSphere.x + (*iter).tSphere.r,
+            (*iter).tSphere.y + (*iter).tSphere.r);
     }
 
     iterEnd = g_EnemyBulletList.end();
     for (iter = g_EnemyBulletList.begin(); iter != iterEnd; iter++)
     {
-        Rectangle(g_hDC, (*iter).rc.l, (*iter).rc.t, (*iter).rc.r, (*iter).rc.b);
+        Ellipse(g_hDC, (*iter).tSphere.x - (*iter).tSphere.r,
+            (*iter).tSphere.y - (*iter).tSphere.r,
+            (*iter).tSphere.x + (*iter).tSphere.r,
+            (*iter).tSphere.y + (*iter).tSphere.r);
     }
 }
