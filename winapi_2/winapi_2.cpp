@@ -37,16 +37,21 @@ WCHAR szWindowClass[MAX_LOADSTRING];            // 기본 창 클래스 이름�
 HWND g_hWnd;
 HDC g_hDC;
 bool g_bLoop = true;
-RECTANGLE g_tPlayerRC = { 100, 100, 200, 200 };
+SPHERE g_tPlayer = { 50.f, 50.f, 50.f };
+POINT g_tGunPos;
+float g_tGunLength = 70.f;
+float g_fPlayerAngle;
+float g_fEnemyAngle;
 ENEMY g_tEnemy;
-//RECTANGLE g_tEnemyRC = { 600, 0, 700, 100 };
-//int Enemy_direction = -1;
+
+#define PI  3.141592f
 
 typedef struct _tagBullet
 {
     SPHERE tSphere;
     float fDist;
     float fLimitDist;
+    float fAngle;
 }BULLET, *PBULLET;
 
 // 플레이어,enemy 총알
@@ -65,6 +70,7 @@ BOOL                InitInstance(HINSTANCE, int);
 LRESULT CALLBACK    WndProc(HWND, UINT, WPARAM, LPARAM);
 INT_PTR CALLBACK    About(HWND, UINT, WPARAM, LPARAM);
 void Run();
+float GetAnglef(float x1, float y1, float x2, float y2);
 
 int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
                      _In_opt_ HINSTANCE hPrevInstance,
@@ -98,6 +104,10 @@ int APIENTRY wWinMain(_In_ HINSTANCE hInstance,
     g_tEnemy.fTime = 0.f;
     g_tEnemy.fLimitTime = 0.5f;
     g_tEnemy.iDir = 1;
+
+    //플레이어의 총구의 위치를 구해준다
+    //g_tGunPos.x = g_tPlayer.x + cosf(g_fPlayerAngle) * g_tGunLength;
+    //g_tGunPos.y = g_tPlayer.y + sinf(g_fPlayerAngle) * g_tGunLength;
 
     HACCEL hAccelTable = LoadAccelerators(hInstance, MAKEINTRESOURCE(IDC_WINAPI2));
 
@@ -294,58 +304,95 @@ void Run()
 
     if (GetAsyncKeyState('D') & 0x8000)
     {
-        g_tPlayerRC.l += fSpeed;
-        g_tPlayerRC.r += fSpeed;
+        g_fPlayerAngle += PI * g_fDeltaTime * fTimeScale;
     }
     if (GetAsyncKeyState('A') & 0x8000)
     {
-        g_tPlayerRC.l -= fSpeed;
-        g_tPlayerRC.r -= fSpeed;
+        g_fPlayerAngle -= PI * g_fDeltaTime * fTimeScale;
     }
     if (GetAsyncKeyState('W') & 0x8000)
     {
-        g_tPlayerRC.t -= fSpeed;
-        g_tPlayerRC.b -= fSpeed;
+        g_tPlayer.x += fSpeed * cosf(g_fPlayerAngle);
+        g_tPlayer.y += fSpeed * sinf(g_fPlayerAngle);
     }
     if (GetAsyncKeyState('S') & 0x8000)
     {
-        g_tPlayerRC.t += fSpeed;
-        g_tPlayerRC.b += fSpeed;
+        g_tPlayer.x -= fSpeed * cosf(g_fPlayerAngle);
+        g_tPlayer.y -= fSpeed * sinf(g_fPlayerAngle);
     }
+    //총구 위치를 구한다
+    g_tGunPos.x = g_tPlayer.x + cosf(g_fPlayerAngle) * g_tGunLength;
+    g_tGunPos.y = g_tPlayer.y + sinf(g_fPlayerAngle) * g_tGunLength;
 
-    if (g_tPlayerRC.r > rcWindow.right)
+    
+    if (g_tPlayer.x > rcWindow.right)
     {
-        g_tPlayerRC.r = rcWindow.right;
-        g_tPlayerRC.l = rcWindow.right - 100;
+        g_tPlayer.x = rcWindow.right;
     }
-    else if (g_tPlayerRC.l < rcWindow.left)
+    else if (g_tPlayer.x < rcWindow.left)
     {
-        g_tPlayerRC.r = rcWindow.left + 100;
-        g_tPlayerRC.l = rcWindow.left;
+        g_tPlayer.x = rcWindow.left;
     }
-    if (g_tPlayerRC.t < rcWindow.top)
+    if (g_tPlayer.y < rcWindow.top)
     {
-        g_tPlayerRC.t = rcWindow.top;
-        g_tPlayerRC.b = rcWindow.top + 100;
+        g_tPlayer.y = rcWindow.top;
     }
-    else if (g_tPlayerRC.b > rcWindow.bottom)
+    else if (g_tPlayer.y > rcWindow.bottom)
     {
-        g_tPlayerRC.t = rcWindow.bottom - 100;
-        g_tPlayerRC.b = rcWindow.bottom;
+        g_tPlayer.y = rcWindow.bottom;
     }
 
     if (GetAsyncKeyState(VK_SPACE) & 0x8000)
     {
         BULLET tBullet;
 
-        tBullet.tSphere.x = g_tPlayerRC.r + 25.f;
-        tBullet.tSphere.y = g_tPlayerRC.t + 25.f;
+        tBullet.tSphere.x = g_tGunPos.x + cosf(g_fPlayerAngle) * 25.f;
+        tBullet.tSphere.y = g_tGunPos.y + sinf(g_fPlayerAngle) * 25.f;
         tBullet.tSphere.r = 25.f;
         tBullet.fDist = 0.f;
         tBullet.fLimitDist = 500.f;
+        tBullet.fAngle = g_fPlayerAngle;
 
         g_PlayerBulletList.push_back(tBullet);
     }
+
+    if (GetAsyncKeyState('1') & 0x8000)
+    {
+        float fAngle = g_fPlayerAngle - PI / 12.f;
+
+        for (int i = 0; i < 3; i++)
+        {
+            BULLET tBullet;
+
+            tBullet.tSphere.x = g_tGunPos.x + cosf(fAngle + PI * i / 12.f) * 25.f;
+            tBullet.tSphere.y = g_tGunPos.y + sinf(fAngle + PI * i / 12.f) * 25.f;
+            tBullet.tSphere.r = 25.f;
+            tBullet.fDist = 0.f;
+            tBullet.fLimitDist = 500.f;
+            tBullet.fAngle = fAngle + PI * i / 12.f;
+
+            g_PlayerBulletList.push_back(tBullet);
+        }
+    }
+    if (GetAsyncKeyState('2') & 0x8000)
+    {
+        float fAngle = g_fPlayerAngle;
+
+        for (int i = 0; i < 60; i++)
+        {
+            BULLET tBullet;
+
+            tBullet.tSphere.x = g_tGunPos.x + cosf(fAngle + PI * i / 30.f) * 25.f;
+            tBullet.tSphere.y = g_tGunPos.y + sinf(fAngle + PI * i / 30.f) * 25.f;
+            tBullet.tSphere.r = 25.f;
+            tBullet.fDist = 0.f;
+            tBullet.fLimitDist = 500.f;
+            tBullet.fAngle = fAngle + PI * i / 30.f;
+
+            g_PlayerBulletList.push_back(tBullet);
+        }
+    }
+
     if (GetAsyncKeyState(VK_LBUTTON) & 0x8000)
     {
         //마우스 위치를 얻어온다
@@ -356,7 +403,7 @@ void Run()
         //스크린좌표를 클라이언트 좌표로 변환한다.
         ScreenToClient(g_hWnd, &ptMouse);
         //플레이어,Enemy와 마우스 충돌처리
-        if (g_tPlayerRC.l <= ptMouse.x && ptMouse.x <= g_tPlayerRC.r &&
+        /*if (g_tPlayerRC.l <= ptMouse.x && ptMouse.x <= g_tPlayerRC.r &&
             g_tPlayerRC.t <= ptMouse.y && ptMouse.y <= g_tPlayerRC.b)
         {
             MessageBox(NULL, L"플레이어 클릭", L"마우스클릭", MB_OK);
@@ -367,7 +414,7 @@ void Run()
         if (g_tEnemy.tSphere.r >= fDist)
         {
             MessageBox(NULL, L"몬스터 클릭", L"마우스클릭", MB_OK);
-        }
+        }*/
 
     }
 
@@ -378,7 +425,8 @@ void Run()
     fSpeed = 1000.f * g_fDeltaTime * fTimeScale;
     for (iter = g_PlayerBulletList.begin(); iter != iterEnd;)
     {
-        (*iter).tSphere.x += fSpeed;
+        (*iter).tSphere.x += cosf((*iter).fAngle) * fSpeed;
+        (*iter).tSphere.y += sinf((*iter).fAngle) * fSpeed;
         (*iter).fDist += fSpeed;
         
         float fX = (*iter).tSphere.x - g_tEnemy.tSphere.x;
@@ -419,16 +467,18 @@ void Run()
 
     // Enemy 총알 발사 , Newcode
     g_tEnemy.fTime += g_fDeltaTime * fTimeScale;
+    g_fEnemyAngle = GetAnglef(g_tEnemy.tSphere.x, g_tEnemy.tSphere.y, g_tPlayer.x, g_tPlayer.y);
     if (g_tEnemy.fTime >= g_tEnemy.fLimitTime)
     {
         g_tEnemy.fTime -= g_tEnemy.fLimitTime;
 
         BULLET e_bullet;
-        e_bullet.tSphere.x = g_tEnemy.tSphere.x - g_tEnemy.tSphere.r - 25.f;
-        e_bullet.tSphere.y = g_tEnemy.tSphere.y;
+        e_bullet.tSphere.x = g_tEnemy.tSphere.x + cosf(g_fEnemyAngle) * (g_tEnemy.tSphere.r + 25.f);
+        e_bullet.tSphere.y = g_tEnemy.tSphere.y + sinf(g_fEnemyAngle) * (g_tEnemy.tSphere.r + 25.f);
         e_bullet.tSphere.r = 25.f;
         e_bullet.fDist = 0.f;
         e_bullet.fLimitDist = 800.f;
+        e_bullet.fAngle = g_fEnemyAngle;
 
         g_EnemyBulletList.push_back(e_bullet);
     }
@@ -437,7 +487,8 @@ void Run()
     iterEnd = g_EnemyBulletList.end();
     for (iter = g_EnemyBulletList.begin(); iter != iterEnd;)
     {
-        (*iter).tSphere.x -= fSpeed;
+        (*iter).tSphere.x += fSpeed * cosf((*iter).fAngle);
+        (*iter).tSphere.y += fSpeed * sinf((*iter).fAngle);
         (*iter).fDist += fSpeed;
         if ((*iter).fDist >= (*iter).fLimitDist)
         {
@@ -511,14 +562,18 @@ void Run()
     }*/
 
     // 출력
-    Rectangle(g_hDC, 0, 0, rcWindow.right, rcWindow.bottom);
+    //Rectangle(g_hDC, 0, 0, rcWindow.right, rcWindow.bottom);
     
-    Rectangle(g_hDC, g_tPlayerRC.l, g_tPlayerRC.t, g_tPlayerRC.r, g_tPlayerRC.b);
+    Ellipse(g_hDC, g_tPlayer.x - g_tPlayer.r, g_tPlayer.y - g_tPlayer.r,
+        g_tPlayer.x + g_tPlayer.r, g_tPlayer.y + g_tPlayer.r);
 
     Ellipse(g_hDC, g_tEnemy.tSphere.x - g_tEnemy.tSphere.r,
         g_tEnemy.tSphere.y - g_tEnemy.tSphere.r,
         g_tEnemy.tSphere.x + g_tEnemy.tSphere.r,
         g_tEnemy.tSphere.y + g_tEnemy.tSphere.r);
+
+    MoveToEx(g_hDC, g_tPlayer.x, g_tPlayer.y, NULL);
+    LineTo(g_hDC, g_tGunPos.x, g_tGunPos.y);
 
     iterEnd = g_PlayerBulletList.end();
     for (iter = g_PlayerBulletList.begin(); iter != iterEnd; iter++)
@@ -537,4 +592,16 @@ void Run()
             (*iter).tSphere.x + (*iter).tSphere.r,
             (*iter).tSphere.y + (*iter).tSphere.r);
     }
+}
+
+float GetAnglef(float x1, float y1, float x2, float y2)
+{
+    float x = x2 - x1;
+    float y = y2 - y1;
+    float hy = sqrt(x * x + y * y);
+    float cos = x / hy;
+    if (y > 0)
+        return acosf(cos);
+    else
+        return 2 * PI - acosf(cos);
 }
